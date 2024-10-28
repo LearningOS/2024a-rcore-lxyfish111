@@ -1,8 +1,14 @@
 //! Process management syscalls
 use crate::{
     config::MAX_SYSCALL_NUM,
-    task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus},
-    timer::get_time_us,
+    task::{exit_current_and_run_next, 
+        suspend_current_and_run_next, 
+        TaskStatus, 
+        get_current_task_status, 
+        get_current_task_syscall_count,
+        get_current_task_time,
+    },
+    timer::{get_time_us, get_time_ms},
 };
 
 #[repr(C)]
@@ -53,5 +59,29 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// YOUR JOB: Finish sys_task_info to pass testcases
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
-    -1
+    // let status = get_current_task_status();
+    // let tm = get_current_task_time();
+
+    // let current_tm = get_time();
+    // let mut tm_ret = if status.clone() == TaskStatus::Exited {
+    //     println!("kernel: sys_task_info TaskStatus::Exited: {}", tm.clone());
+    //     tm
+    // } else {
+    //     println!("kernel: sys_task_info else: {}, current_tm: {}, tm:{}", (current_tm.clone() - tm.clone()), current_tm.clone(), tm.clone());
+    //     current_tm - tm
+    // };
+    
+
+    // tm_ret = tm_ret * 1000 / CLOCK_FREQ;
+    // println!("tm_ret:{}", tm_ret);
+
+    unsafe {
+        *_ti = TaskInfo {
+            status: get_current_task_status(),
+            syscall_times: get_current_task_syscall_count(),
+            time: (get_time_ms() - get_current_task_time())
+        }
+    };
+
+    0
 }

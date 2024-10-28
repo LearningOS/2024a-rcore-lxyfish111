@@ -14,11 +14,17 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use core::borrow::BorrowMut;
+
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::{get_time_ms};
 use lazy_static::*;
 use switch::__switch;
+use crate::{
+    config::MAX_SYSCALL_NUM
+};
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -54,6 +60,8 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            time: 0
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -80,6 +88,10 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
+        if task0.time == 0 {
+            task0.time = get_time_ms();
+        }
+        
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -102,6 +114,9 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         inner.tasks[current].task_status = TaskStatus::Exited;
+        let tm = get_time_ms();
+        let start_tm = inner.tasks[current].time;
+        inner.tasks[current].time = tm - start_tm;
     }
 
     /// Find next task to run and return task id.
@@ -122,6 +137,10 @@ impl TaskManager {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
+            if inner.tasks[next].time == 0 {
+                inner.tasks[next].time = get_time_ms();
+            }
+            
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
@@ -168,4 +187,30 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Get the current task status
+pub fn get_current_task_status() ->TaskStatus {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    inner.tasks[inner.current_task].task_status
+}
+
+/// Get the syscall count
+pub fn get_current_task_syscall_count() -> [u32; MAX_SYSCALL_NUM] {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    inner.tasks[inner.current_task].syscall_times
+}
+
+/// Get time of task
+pub fn get_current_task_time() -> usize {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    inner.tasks[inner.current_task].time
+}
+
+/// Increase current task syscall count
+pub fn increase_current_task_syscall_count(syscall_id: usize) {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let pos = inner.current_task;
+    let cnt = inner.tasks[pos].syscall_times[syscall_id].borrow_mut();
+    *cnt += 1;
 }
