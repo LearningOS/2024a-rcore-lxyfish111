@@ -1,9 +1,12 @@
 //! Process management syscalls
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
+        current_user_token, get_current_task, mmap, munmap,
     },
+    timer::get_time_us,
+    mm::page_table::translated_mut_ptr,
 };
 
 #[repr(C)]
@@ -43,7 +46,13 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+    let us = get_time_us();
+    let p_ts = translated_mut_ptr(current_user_token(),_ts);
+    *p_ts = TimeVal {
+        sec: us / 1_000_000,
+        usec: us % 1_000_000,
+    };
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -51,19 +60,37 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    let (status,syscall_times,start_time)=get_current_task();
+    let p_ti=translated_mut_ptr(current_user_token(), _ti);
+    let time_now = get_time_us();
+    let time_now_ms = ((time_now / 1_000_000) & 0xffff) * 1000 + (time_now % 1_000_000 ) / 1000;
+    let time_start_ms = ((start_time / 1_000_000) & 0xffff) * 1000 + (start_time % 1_000_000 ) / 1000;
+    let time = time_now_ms - time_start_ms;
+    *p_ti=TaskInfo{
+            status,
+            syscall_times,
+            time,
+        };
+    0
 }
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    //对合法性进行检查
+    if _start %  PAGE_SIZE != 0 || _port & !0x7 != 0 || _port & 0x7 == 0{
+        return -1;
+    }
+    mmap(_start, _len, _port)
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    if _start %  PAGE_SIZE != 0 {
+        return -1;
+    }
+    munmap(_start, _len)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

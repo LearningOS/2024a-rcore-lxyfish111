@@ -1,6 +1,6 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
 
-use super::{frame_alloc, FrameTracker, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+use super::{frame_alloc, FrameTracker, PhysPageNum, StepByOne, VirtAddr, VirtPageNum, PhysAddr};
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -170,4 +170,21 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
         start = end_va.into();
     }
     v
+}
+
+/// 从虚拟地址转换为物理地址
+pub fn virt_to_pyhs(token: usize,va: VirtAddr) -> PhysAddr{   
+    let pagetable = PageTable::from_token(token);//从token查页表
+    let vpn = va.floor();  //获取虚拟地址所处的虚拟页的页号
+    //页表+虚拟页号->三级页表项(指向物理页的页表项)->物理页号->物理地址的前半部分
+    let mut pa: PhysAddr = pagetable.translate(vpn).unwrap().ppn().into(); 
+    pa.0 += va.page_offset();  //前半部分与页内偏移组合为完整物理地址
+    pa  
+}
+
+/// return a physical pointer in memory set of the pagetable token 
+pub fn translated_mut_ptr<T>(token: usize, ptr: *mut T) -> &'static mut T{
+    let ptr_va = VirtAddr::from(ptr as usize);
+    let ptr_pa = virt_to_pyhs(token, ptr_va);
+    ptr_pa.get_mut()  //rCore的三种粒度访问物理页帧的方式之三:基于变量类型
 }
