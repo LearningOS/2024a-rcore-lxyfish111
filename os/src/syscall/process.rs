@@ -227,7 +227,18 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    if let Some(data)=get_app_data_by_name(path.as_str()){
+        let current_task=current_task().unwrap();
+        let task=current_task.spawn(data);
+        let pid=task.getpid();
+        add_task(task);
+        pid as isize
+    }
+    else {
+        -1
+    }
 }
 
 /// set priority syscall
@@ -238,5 +249,10 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    if _prio<=1{
+        return -1;
+    }
+    else{
+        current_task().unwrap().set_priority(_prio)
+    }
 }

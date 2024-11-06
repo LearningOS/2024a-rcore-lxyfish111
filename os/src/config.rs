@@ -22,3 +22,7 @@ pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 /// qemu board info
 pub use crate::board::{CLOCK_FREQ, MMIO};
+
+///stride
+pub const BIG_STRIDE:usize=usize::MAX;
+
