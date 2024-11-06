@@ -34,6 +34,54 @@ impl TaskControlBlock {
         let inner = self.inner_exclusive_access();
         inner.memory_set.token()
     }
+
+    ///spawn
+    pub fn spawn(self:&Arc<TaskControlBlock>,elf_data: &[u8])->Arc<TaskControlBlock>{
+        let mut parent_inner=self.inner_exclusive_access();// 来自fork
+        let (memory_set,user_sp,entry_point)=MemorySet::from_elf(elf_data); //来自exec
+        let trap_cx_ppn=memory_set.translate(VirtAddr::from(TRAP_CONTEXT_BASE).into()).unwrap().ppn();//来自exec
+        let pid_handle=pid_alloc();//来自fork
+        let kernel_stack=kstack_alloc();//分配新的内核栈
+        let kernel_stack_top=kernel_stack.get_top();
+        let task_control_block=Arc::new(Self{
+            pid:pid_handle,
+            kernel_stack,
+            inner:unsafe{
+                UPSafeCell::new(TaskControlBlockInner { 
+                    trap_cx_ppn, 
+                    base_size: user_sp, 
+                    task_cx: TaskContext::goto_trap_return(kernel_stack_top), 
+                    task_status: TaskStatus::Ready, 
+                    memory_set, 
+                    parent: Some(Arc::downgrade(self)), 
+                    children: Vec::new(), 
+                    exit_code: 0, 
+                    heap_bottom: user_sp, 
+                    program_brk: user_sp, 
+                    stride:0,
+                    priority:16,
+                })
+            },
+        });
+        parent_inner.children.push(task_control_block.clone());
+        let trap_cx=task_control_block.inner_exclusive_access().get_trap_cx();
+        *trap_cx=TrapContext::app_init_context(
+          entry_point, 
+          user_sp, 
+          KERNEL_SPACE.exclusive_access().token(),
+          kernel_stack_top, 
+          trap_handler as usize
+        );
+
+        task_control_block
+    }
+
+    /// set priority
+    pub fn set_priority(&self, prio: isize)->isize{
+        let mut inner = self.inner_exclusive_access();
+        inner.priority = prio as usize;
+        inner.priority as isize
+    }
 }
 
 pub struct TaskControlBlockInner {
@@ -68,6 +116,12 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// stride
+    pub stride: usize,
+
+    /// priority
+    pub priority: usize,
 }
 
 impl TaskControlBlockInner {
@@ -118,6 +172,8 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    priority: 0,
+                    stride: 0,
                 })
             },
         };
@@ -191,6 +247,8 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    priority: 0,
+                    stride: 0,
                 })
             },
         });
