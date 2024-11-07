@@ -105,16 +105,15 @@ mod fs;
 mod process;
 mod sync;
 mod thread;
-
 use fs::*;
 use process::*;
 use sync::*;
 use thread::*;
-
 use crate::fs::Stat;
-
+use crate::task::inc_syscall_times;
 /// handle syscall exception with `syscall_id` and other arguments
-pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
+pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    inc_syscall_times(syscall_id);
     match syscall_id {
         SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_LINKAT => sys_linkat(args[1] as *const u8, args[3] as *const u8),

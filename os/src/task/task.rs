@@ -6,6 +6,7 @@ use crate::trap::TrapContext;
 use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};
 use core::cell::RefMut;
+use crate::config::MAX_SYSCALL_NUM;
 
 /// Task control block structure
 pub struct TaskControlBlock {
@@ -54,6 +55,8 @@ impl TaskControlBlock {
                     program_brk: user_sp, 
                     stride:0,
                     priority:16,
+                    syscall_times:[0; MAX_SYSCALL_NUM],
+                    start_time: 0,
                 })
             },
         });
@@ -95,6 +98,12 @@ pub struct TaskControlBlockInner {
 
     /// priority
     pub priority: usize,
+
+    /// system call time
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+
+    /// start time
+    pub start_time: usize,
 }
 
 impl TaskControlBlockInner {
@@ -145,6 +154,8 @@ impl TaskControlBlock {
                     priority: 0,
                     stride: 0,
                     exit_code: None,
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    start_time: 0,
                 })
             },
         };
@@ -229,6 +240,8 @@ impl TaskControlBlock {
                     priority: 0,
                     stride: 0,
                     exit_code: None,
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    start_time: 0,
                 })
             },
         }
