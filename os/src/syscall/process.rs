@@ -2,13 +2,13 @@
 use alloc::sync::Arc;
 
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     loader::get_app_data_by_name,
-    mm::{translated_refmut, translated_str},
+    mm::{translated_refmut, translated_str, translated_mut_ptr},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, TaskStatus,
-    },
+        suspend_current_and_run_next, TaskStatus, get_current_task, mmap, munmap,
+    }, timer::{get_time_us},
 };
 
 #[repr(C)]
@@ -122,7 +122,13 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let us=get_time_us();
+    let p_ts = translated_mut_ptr(current_user_token(), _ts);
+    *p_ts = TimeVal {
+        sec: us / 1_000_000,
+        usec: us % 1_000_000,
+    };
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -133,7 +139,18 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
         "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let (status,syscall_times,start_time)=get_current_task();
+    let p_ti=translated_mut_ptr(current_user_token(), _ti);
+    let time_now = get_time_us();
+    let time_now_ms = ((time_now / 1_000_000) & 0xffff) * 1000 + (time_now % 1_000_000 ) / 1000;
+    let time_start_ms = ((start_time / 1_000_000) & 0xffff) * 1000 + (start_time % 1_000_000 ) / 1000;
+    let time = time_now_ms - time_start_ms;
+    *p_ti = TaskInfo{
+            status,
+            syscall_times,
+            time,
+        };
+    0
 }
 
 /// YOUR JOB: Implement mmap.
@@ -142,7 +159,10 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if _start %  PAGE_SIZE != 0 || _port & !0x7 != 0 || _port & 0x7 == 0{
+        return -1;
+    }
+    mmap(_start, _len, _port)
 }
 
 /// YOUR JOB: Implement munmap.
@@ -151,7 +171,10 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if _start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    munmap(_start, _len)
 }
 
 /// change data segment size

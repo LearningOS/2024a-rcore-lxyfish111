@@ -213,3 +213,19 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .unwrap()
         .get_mut()
 }
+
+/// 虚拟地址转换为物理地址
+pub fn virt_to_pyhs(token: usize,va: VirtAddr) -> PhysAddr{   
+    let pagetable = PageTable::from_token(token);
+    let vpn = va.floor(); 
+    let mut pa: PhysAddr = pagetable.translate(vpn).unwrap().ppn().into(); 
+    pa.0 += va.page_offset();
+    pa  
+}
+
+/// return a physical pointer in memory set of the pagetable token 
+pub fn translated_mut_ptr<T>(token: usize, ptr: *mut T) -> &'static mut T{
+    let ptr_va = VirtAddr::from(ptr as usize);
+    let ptr_pa = virt_to_pyhs(token, ptr_va);
+    ptr_pa.get_mut()
+}

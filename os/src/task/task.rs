@@ -8,6 +8,7 @@ use crate::trap::{trap_handler, TrapContext};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use crate::config::MAX_SYSCALL_NUM;
 
 /// Task control block structure
 ///
@@ -60,6 +61,8 @@ impl TaskControlBlock {
                     program_brk: user_sp, 
                     stride:0,
                     priority:16,
+                    syscall_times:[0; MAX_SYSCALL_NUM],
+                    start_time: 0,
                 })
             },
         });
@@ -122,6 +125,12 @@ pub struct TaskControlBlockInner {
 
     /// priority
     pub priority: usize,
+
+    /// system call time
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+
+    /// start time
+    pub start_time: usize,
 }
 
 impl TaskControlBlockInner {
@@ -174,6 +183,8 @@ impl TaskControlBlock {
                     program_brk: user_sp,
                     priority: 0,
                     stride: 0,
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    start_time: 0,
                 })
             },
         };
@@ -249,6 +260,8 @@ impl TaskControlBlock {
                     program_brk: parent_inner.program_brk,
                     priority: 0,
                     stride: 0,
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    start_time: 0,
                 })
             },
         });
