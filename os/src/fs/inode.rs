@@ -64,6 +64,16 @@ pub fn list_apps() {
     println!("**************/");
 }
 
+/// create link
+pub fn linkat(old_name: &str, new_name: &str) -> isize {
+    ROOT_INODE.create_link(old_name, new_name)
+}
+
+/// delete link
+pub fn unlinkat(name: &str) -> isize {
+    ROOT_INODE.delete_link(name)
+}
+
 bitflags! {
     ///  The flags argument to the open() system call is constructed by ORing together zero or more of the following values:
     pub struct OpenFlags: u32 {
