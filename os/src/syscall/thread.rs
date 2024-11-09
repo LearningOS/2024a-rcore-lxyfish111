@@ -4,6 +4,7 @@ use crate::{
     trap::{trap_handler, TrapContext},
 };
 use alloc::sync::Arc;
+use alloc::vec;
 /// thread create syscall
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     trace!(
@@ -50,6 +51,15 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
         trap_handler as usize,
     );
     (*new_task_trap_cx).x[10] = arg;
+
+    let mutex_len = process_inner.mutex_available.len();
+    let semaphore_len = process_inner.semaphore_available.len();
+    process_inner.mutex_allocation.push(vec![0; mutex_len]);
+    process_inner.mutex_need.push(vec![0;mutex_len]);
+    process_inner.semaphore_allocation.push(vec![0; semaphore_len]);
+    process_inner.semaphore_need.push(vec![0;semaphore_len]);
+    add_task(Arc::clone(&new_task));
+
     new_task_tid as isize
 }
 /// get current thread id syscall
