@@ -8,9 +8,15 @@ use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
 /// Virtual filesystem layer over easy-fs
 pub struct Inode {
-    block_id: usize,
-    block_offset: usize,
-    fs: Arc<Mutex<EasyFileSystem>>,
+    
+    /// block id
+    pub block_id: usize,
+
+    /// block offset
+    pub block_offset: usize,
+    
+    /// fs arc
+    pub fs: Arc<Mutex<EasyFileSystem>>,
     block_device: Arc<dyn BlockDevice>,
 }
 
@@ -155,6 +161,31 @@ impl Inode {
             v
         })
     }
+
+    /// get link num
+    pub fn get_link_num(&self, block_id: usize, block_offset: usize) -> usize {
+        let _fs = self.fs.lock();
+        let mut count: usize = 0;
+        self.read_disk_inode(|disk_inode| {
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            for i in 0..file_count {
+                let mut dirent = DirEntry::empty();
+                assert_eq!(
+                    disk_inode.read_at(
+                        i * DIRENT_SZ,
+                        dirent.as_bytes_mut(),
+                        &self.block_device,
+                    ),
+                    DIRENT_SZ,
+                );
+                let (this_block_id, this_offset) = _fs.get_disk_inode_pos(dirent.inode_id());
+                if (this_block_id as usize == block_id)&& (this_offset as usize == block_offset) {
+                    count += 1;
+                }
+            }
+            count
+        })
+    }
     /// Read data from current inode
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
         let _fs = self.fs.lock();
@@ -228,4 +259,5 @@ impl Inode {
             -1
         })
     }
+
 }

@@ -39,6 +39,8 @@ impl File for Stdin {
     fn write(&self, _user_buf: UserBuffer) -> usize {
         panic!("Cannot write to stdin!");
     }
+    fn get_inode_id(&self) -> u64 { 0 }
+    fn get_link_num(&self) -> usize { 0 }
 }
 
 impl File for Stdout {
@@ -57,4 +59,6 @@ impl File for Stdout {
         }
         user_buf.len()
     }
+    fn get_inode_id(&self) -> u64 { 0 }
+    fn get_link_num(&self) -> usize { 0 }
 }

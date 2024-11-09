@@ -40,9 +40,9 @@ impl TaskControlBlock {
 
     ///spawn
     pub fn spawn(self:&Arc<TaskControlBlock>,elf_data: &[u8])->Arc<TaskControlBlock>{
-        let mut parent_inner=self.inner_exclusive_access();// 来自fork
-        let (memory_set,user_sp,entry_point)=MemorySet::from_elf(elf_data); //来自exec
-        let trap_cx_ppn=memory_set.translate(VirtAddr::from(TRAP_CONTEXT_BASE).into()).unwrap().ppn();//来自exec
+        let mut parent_inner=self.inner_exclusive_access();
+        let (memory_set,user_sp,entry_point)=MemorySet::from_elf(elf_data);
+        let trap_cx_ppn=memory_set.translate(VirtAddr::from(TRAP_CONTEXT_BASE).into()).unwrap().ppn();
         let pid_handle=pid_alloc();//来自fork
         let kernel_stack=kstack_alloc();//分配新的内核栈
         let kernel_stack_top=kernel_stack.get_top();
@@ -65,6 +65,14 @@ impl TaskControlBlock {
                     priority:16,
                     syscall_times:[0; MAX_SYSCALL_NUM],
                     start_time: 0,
+                    fd_table:  vec![
+                        // 0 -> stdin
+                        Some(Arc::new(Stdin)),
+                        // 1 -> stdout
+                        Some(Arc::new(Stdout)),
+                        // 2 -> stderr
+                        Some(Arc::new(Stdout)),
+                    ],
                 })
             },
         });
