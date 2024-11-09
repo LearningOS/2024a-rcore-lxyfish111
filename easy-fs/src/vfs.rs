@@ -15,11 +15,17 @@ use spin::{Mutex, MutexGuard};
 /// Inode struct in memory
 pub struct Inode {
     /// The block id of the inode
-    block_id: usize,
+    
+    /// block id
+    pub block_id: usize,
     /// The offset of the inode in the block
-    block_offset: usize,
+
+    /// block offset
+    pub block_offset: usize,
     /// The file system
-    fs: Arc<Mutex<EasyFileSystem>>,
+    
+    /// fs arc
+    pub fs: Arc<Mutex<EasyFileSystem>>,
     /// The block device
     block_device: Arc<dyn BlockDevice>,
 }
@@ -169,6 +175,31 @@ impl Inode {
             v
         })
     }
+
+    /// get link num
+    pub fn get_link_num(&self, block_id: usize, block_offset: usize) -> usize {
+        let _fs = self.fs.lock();
+        let mut count: usize = 0;
+        self.read_disk_inode(|disk_inode| {
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            for i in 0..file_count {
+                let mut dirent = DirEntry::empty();
+                assert_eq!(
+                    disk_inode.read_at(
+                        i * DIRENT_SZ,
+                        dirent.as_bytes_mut(),
+                        &self.block_device,
+                    ),
+                    DIRENT_SZ,
+                );
+                let (this_block_id, this_offset) = _fs.get_disk_inode_pos(dirent.inode_id());
+                if (this_block_id as usize == block_id)&& (this_offset as usize == block_offset) {
+                    count += 1;
+                }
+            }
+            count
+        })
+    }
     /// Read the content in offset position of the file into 'buf'
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
         let _fs = self.fs.lock();
@@ -242,4 +273,5 @@ impl Inode {
             -1
         })
     }
+
 }

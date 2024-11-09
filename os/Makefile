@@ -2,21 +2,17 @@
 TARGET := riscv64gc-unknown-none-elf
 MODE := release
 KERNEL_ELF := target/$(TARGET)/$(MODE)/os
-KERNEL_BIN := $(KERNEL_ELF).bin
-DISASM_TMP := target/$(TARGET)/$(MODE)/asm
-FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
-APPS := ../user/src/bin/*
-OFFLINE :=
+FS_IMG := ../ci-user/user/build/fs.img
 
 # BOARD
-BOARD := qemu
+BOARD ?= qemu
 SBI ?= rustsbi
 BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
 
-# Building mode argument
-ifeq ($(MODE), release)
-	MODE_ARG := --release
-endif
+fsimg:
+	cd ../easy-fs-fuse && cargo run --release -- \
+		-s ../ci-user/user/build/elf \
+		-o $(FS_IMG)
 
 # KERNEL ENTRY
 KERNEL_ENTRY_PA := 0x80200000
@@ -58,17 +54,7 @@ kernel:
 	@cargo build $(MODE_ARG)
 
 clean:
-	@cargo clean
-
-disasm: kernel
-	@$(OBJDUMP) $(DISASM) $(KERNEL_ELF) | less
-
-disasm-vim: kernel
-	@$(OBJDUMP) $(DISASM) $(KERNEL_ELF) > $(DISASM_TMP)
-	@vim $(DISASM_TMP)
-	@rm $(DISASM_TMP)
-
-run: build run-inner
+	cargo clean
 
 run-inner:
 	@qemu-system-riscv64 \
@@ -76,9 +62,9 @@ run-inner:
 		-machine virt \
 		-nographic \
 		-bios $(BOOTLOADER) \
-		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+		-kernel $(KERNEL_ELF) \
 		-drive file=$(FS_IMG),if=none,format=raw,id=x0 \
-        -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+		-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 debug: build
 	@tmux new-session -d \

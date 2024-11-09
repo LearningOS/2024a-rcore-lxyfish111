@@ -1,5 +1,8 @@
-use crate::fs::{make_pipe, open_file, OpenFlags, Stat, linkat, unlinkat};
-use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
+
+use core::borrow::Borrow;
+
+use crate::fs::{make_pipe, open_file, OpenFlags, Stat, linkat, unlinkat, StatMode};
+use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer, translated_mut_ptr};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
 /// write syscall
@@ -129,7 +132,32 @@ pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
         "kernel:pid[{}] sys_fstat NOT IMPLEMENTED",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    let task = current_task().unwrap();
+    let task_inner = task.inner_exclusive_access();
+    // let mut inner = task.inner_exclusive_access();
+    if _fd >= task_inner.fd_table.len() {
+        return -1;
+    }
+    if task_inner.fd_table[_fd].is_none() {
+        return -1;
+    }
+
+    let x = if let Some(inode) = task_inner.fd_table[_fd].borrow() {
+        let p_st = translated_mut_ptr(task_inner.get_user_token(), _st);
+        *p_st = Stat{
+            dev: 0,
+            ino: inode.get_inode_id(),
+            mode: StatMode::FILE,
+            nlink: inode.get_link_num() as u32,
+            pad: [0 as u64; 7],
+        };
+        0
+    } else {
+        -1
+    };
+
+    x
+
 }
 
 /// YOUR JOB: Implement linkat.
