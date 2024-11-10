@@ -20,7 +20,7 @@ mod switch;
 mod task;
 
 use self::id::TaskUserRes;
-use crate::{fs::{open_file, OpenFlags}, config::MAX_SYSCALL_NUM, mm::{self, MapPermission}};
+use crate::fs::{open_file, OpenFlags};
 use crate::task::manager::add_stopping_task;
 use crate::timer::remove_timer;
 use alloc::{sync::Arc, vec::Vec};
@@ -49,7 +49,6 @@ pub fn suspend_current_and_run_next() {
     let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
     // Change status to Ready
     task_inner.task_status = TaskStatus::Ready;
-
     drop(task_inner);
     // ---- release current TCB
 
@@ -182,8 +181,7 @@ lazy_static! {
 
 ///Add init process to the manager
 pub fn add_initproc() {
-    add_task(INITPROC.clone());
-    //let _initproc = INITPROC.clone();
+    let _initproc = INITPROC.clone();
 }
 
 /// Check if the current task has any signal to handle
@@ -205,164 +203,4 @@ pub fn remove_inactive_task(task: Arc<TaskControlBlock>) {
     remove_task(Arc::clone(&task));
     trace!("kernel: remove_inactive_task .. remove_timer");
     remove_timer(Arc::clone(&task));
-}
-
-/// get current task
-pub fn get_current_task()-> (TaskStatus, [u32; MAX_SYSCALL_NUM],usize){
-    let binding = current_task().unwrap();
-    let current = binding.inner_exclusive_access();
-    let mut syscall_times_clone:[u32;MAX_SYSCALL_NUM]=[0;MAX_SYSCALL_NUM];
-    for i in 0..current.syscall_times.len(){
-        syscall_times_clone[i] = current.syscall_times[i];
-    }
-    
-    (
-        TaskStatus::Running,
-        syscall_times_clone,
-        current.start_time,
-    )
-}
-
-/// increase the syscall times
-pub fn inc_syscall_times(syscall_id:usize){
-    let binding = current_task().unwrap();
-    let mut inner = binding.inner_exclusive_access();
-    inner.syscall_times[syscall_id] += 1;
-}
-
-/// apply memory
-pub fn mmap(start: usize, len: usize, port: usize)->isize{
-    let binding = current_task().unwrap();
-    let mut inner = binding.inner_exclusive_access();
-
-    let start_va=mm::VirtAddr::from(start);
-    let end_va=mm::VirtAddr::from(start+len);
-
-    for vpn in mm::VPNRange::new(start_va.floor(),end_va.ceil()){
-        if let Some(pte) =  inner.memory_set.translate(vpn){
-            if pte.is_valid(){
-                return -1;
-            }
-        }
-    }
-    let map_permission: mm::MapPermission = MapPermission::from_bits((port as u8) << 1).unwrap() | MapPermission::U;
-    inner.memory_set.insert_framed_area(start_va, end_va, map_permission);
-
-    for vpn in mm::VPNRange::new(start_va.floor(),end_va.ceil()){
-        match inner.memory_set.translate(vpn) {
-            Some(pte)=>{
-                if pte.is_valid()==false{
-                    return -1;
-                }
-            }
-            None => {
-                return -1;
-            }
-        }
-    }
-    0
-}
-
-/// cancel memory mapping
-pub fn munmap(start:usize,len:usize)->isize{
-    let binding = current_task().unwrap();
-    let mut inner = binding.inner_exclusive_access();
-
-    let start_va=mm::VirtAddr::from(start);
-    let end_va=mm::VirtAddr::from(start+len);
-    //检查从起始地址到结束地址中是否有未被映射的内存
-    for vpn in mm::VPNRange::new(start_va.floor(),end_va.ceil()){
-        match inner.memory_set.translate(vpn) {
-            Some(pte)=>{
-                if pte.is_valid()==false{
-                    return -1;
-                }
-            }
-            None => {
-                return -1;
-            }
-        }
-    }
-    inner.memory_set.delete_frame_area(start_va, end_va);//按照虚拟地址从物理内存中删除页框
-    0
-}
-
-/// get current task
-pub fn get_current_task()-> (TaskStatus, [u32; MAX_SYSCALL_NUM],usize){
-    let binding = current_task().unwrap();
-    let current = binding.inner_exclusive_access();
-    let mut syscall_times_clone:[u32;MAX_SYSCALL_NUM]=[0;MAX_SYSCALL_NUM];
-    for i in 0..current.syscall_times.len(){
-        syscall_times_clone[i] = current.syscall_times[i];
-    }
-    
-    (
-        TaskStatus::Running,
-        syscall_times_clone,
-        current.start_time,
-    )
-}
-
-/// increase the syscall times
-pub fn inc_syscall_times(syscall_id:usize){
-    let binding = current_task().unwrap();
-    let mut inner = binding.inner_exclusive_access();
-    inner.syscall_times[syscall_id] += 1;
-}
-
-/// apply memory
-pub fn mmap(start: usize, len: usize, port: usize)->isize{
-    let binding = current_task().unwrap();
-    let mut inner = binding.inner_exclusive_access();
-
-    let start_va=mm::VirtAddr::from(start);
-    let end_va=mm::VirtAddr::from(start+len);
-
-    for vpn in mm::VPNRange::new(start_va.floor(),end_va.ceil()){
-        if let Some(pte) =  inner.memory_set.translate(vpn){
-            if pte.is_valid(){
-                return -1;
-            }
-        }
-    }
-    let map_permission: mm::MapPermission = MapPermission::from_bits((port as u8) << 1).unwrap() | MapPermission::U;
-    inner.memory_set.insert_framed_area(start_va, end_va, map_permission);
-
-    for vpn in mm::VPNRange::new(start_va.floor(),end_va.ceil()){
-        match inner.memory_set.translate(vpn) {
-            Some(pte)=>{
-                if pte.is_valid()==false{
-                    return -1;
-                }
-            }
-            None => {
-                return -1;
-            }
-        }
-    }
-    0
-}
-
-/// cancel memory mapping
-pub fn munmap(start:usize,len:usize)->isize{
-    let binding = current_task().unwrap();
-    let mut inner = binding.inner_exclusive_access();
-
-    let start_va=mm::VirtAddr::from(start);
-    let end_va=mm::VirtAddr::from(start+len);
-    //检查从起始地址到结束地址中是否有未被映射的内存
-    for vpn in mm::VPNRange::new(start_va.floor(),end_va.ceil()){
-        match inner.memory_set.translate(vpn) {
-            Some(pte)=>{
-                if pte.is_valid()==false{
-                    return -1;
-                }
-            }
-            None => {
-                return -1;
-            }
-        }
-    }
-    inner.memory_set.delete_frame_area(start_va, end_va);//按照虚拟地址从物理内存中删除页框
-    0
 }

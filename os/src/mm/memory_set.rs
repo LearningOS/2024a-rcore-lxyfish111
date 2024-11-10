@@ -84,23 +84,6 @@ impl MemorySet {
             }
         }
     }
-
-    /// delete data area
-    pub fn delete_frame_area(
-        &mut self,
-        start_va: VirtAddr,
-        end_va: VirtAddr,
-    ) {
-        let start_vpn = start_va.floor();
-        let end_vpn = end_va.ceil(); 
-        let map_area = self.areas.iter_mut().filter(|a| {
-            a.vpn_range.get_start() == start_vpn && 
-            a.vpn_range.get_end() == end_vpn
-        }).next().unwrap(); 
-
-        map_area.unmap(&mut self.page_table);
-    }
-
     /// Add a new MapArea into this MemorySet.
     /// Assuming that there are no conflicts in the virtual address
     /// space.

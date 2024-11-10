@@ -1,4 +1,4 @@
-use super::{File};
+use super::File;
 use crate::drivers::BLOCK_DEVICE;
 use crate::mm::UserBuffer;
 use crate::sync::UPSafeCell;
@@ -12,14 +12,12 @@ use lazy_static::*;
 pub struct OSInode {
     readable: bool,
     writable: bool,
-
-    /// inner osinodeinner
-    pub inner: UPSafeCell<OSInodeInner>,
+    inner: UPSafeCell<OSInodeInner>,
 }
 /// inner of inode in memory
 pub struct OSInodeInner {
     offset: usize,
-    pub inode: Arc<Inode>,
+    inode: Arc<Inode>,
 }
 
 impl OSInode {
@@ -48,11 +46,9 @@ impl OSInode {
         }
         v
     }
-
 }
 
 lazy_static! {
-    /// get the static root inode
     pub static ref ROOT_INODE: Arc<Inode> = {
         let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
         Arc::new(EasyFileSystem::root_inode(&efs))
@@ -66,16 +62,6 @@ pub fn list_apps() {
         println!("{}", app);
     }
     println!("**************/");
-}
-
-/// create link
-pub fn linkat(old_name: &str, new_name: &str) -> isize {
-    ROOT_INODE.create_link(old_name, new_name)
-}
-
-/// delete link
-pub fn unlinkat(name: &str) -> isize {
-    ROOT_INODE.delete_link(name)
 }
 
 bitflags! {
@@ -133,10 +119,6 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
     }
 }
 
-fn get_link_num(block_id: usize, block_offset: usize) -> usize {
-    ROOT_INODE.get_link_num(block_id, block_offset)
-}
-
 impl File for OSInode {
     /// file readable?
     fn readable(&self) -> bool {
@@ -174,15 +156,4 @@ impl File for OSInode {
         }
         total_write_size
     }
-    fn get_inode_id(&self) -> u64 {
-        self.inner.exclusive_access().inode.block_id.try_into().unwrap()
-    }
-    fn get_link_num(&self) -> usize {
-        let inner = &self.inner.exclusive_access().inode;
-        get_link_num(
-            inner.block_id, 
-            inner.block_offset
-        )
-    }
-
 }
