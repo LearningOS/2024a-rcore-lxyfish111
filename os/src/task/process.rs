@@ -101,7 +101,7 @@ impl ProcessControlBlockInner {
     pub fn check_deadlock_mutex(&self) -> isize {
         let mut work: Vec<usize> = Vec::new();
         let mut finish: Vec<bool> = Vec::new();
-        for i in 0..self.thread_count() {
+        for _ in 0..self.thread_count() {
             finish.push(false);
         }
         for u in self.mutex_available.iter() {
@@ -146,7 +146,7 @@ impl ProcessControlBlockInner {
     pub fn check_deadlock_semaphore(&self) -> isize {
         let mut work: Vec<usize> = Vec::new();
         let mut finish: Vec<bool> = Vec::new();
-        for i in 0..self.thread_count() {
+        for _ in 0..self.thread_count() {
             finish.push(false);
         }
         for u in self.semaphore_available.iter() {
@@ -417,36 +417,5 @@ impl ProcessControlBlock {
     pub fn getpid(&self) -> usize {
         self.pid.0
     }
-
-    /// kernel process
-    pub fn kernel_process() -> Arc<Self> {
-        let memory_set = MemorySet::kernel_copy();
-        let process = Arc::new(ProcessControlBlock {
-            pid: super::pid_alloc(),
-            inner: unsafe {
-                UPSafeCell::new(ProcessControlBlockInner {
-                    is_zombie: false,
-                    memory_set: memory_set,
-                    parent: None,
-                    children: Vec::new(),
-                    exit_code: 0,
-                    fd_table: Vec::new(),
-                    signals: SignalFlags::empty(),
-                    tasks: Vec::new(),
-                    task_res_allocator: RecycleAllocator::new(),
-                    mutex_list: Vec::new(),
-                    semaphore_list: Vec::new(),
-                    condvar_list: Vec::new(),
-                    mutex_available: Vec::new(),
-                    semaphore_available: Vec::new(),
-                    mutex_allocation: Vec::new(),
-                    semaphore_allocation: Vec::new(),
-                    mutex_need: Vec::new(),
-                    semaphore_need: Vec::new(),
-                    deadlock_detect: false,
-                })
-            },
-        });
-        process
-    }
 }
+

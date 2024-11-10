@@ -12,6 +12,8 @@ pub trait Mutex: Sync + Send {
     fn lock(&self);
     /// Unlock the mutex
     fn unlock(&self);
+    /// get next queue id
+    fn get_next_queue_id(&self) -> isize;
 }
 
 /// Spinlock Mutex struct
@@ -49,6 +51,10 @@ impl Mutex for MutexSpin {
         trace!("kernel: MutexSpin::unlock");
         let mut locked = self.locked.exclusive_access();
         *locked = false;
+    }
+
+    fn get_next_queue_id(&self) ->isize {
+        return -1;
     }
 }
 
@@ -100,6 +106,19 @@ impl Mutex for MutexBlocking {
             wakeup_task(waking_task);
         } else {
             mutex_inner.locked = false;
+        }
+    }
+
+    fn get_next_queue_id(&self) -> isize {
+        let mutex_inner = self.inner.exclusive_access();
+        if mutex_inner.wait_queue.len() < 1 {
+            -1
+        } else {
+            if let Some(waking_task) = mutex_inner.wait_queue.front() {
+                waking_task.inner_exclusive_access().res.as_ref().unwrap().tid as isize
+            } else {
+                -1
+            }
         }
     }
 }

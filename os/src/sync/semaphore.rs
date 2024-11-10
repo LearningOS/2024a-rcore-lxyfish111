@@ -16,6 +16,19 @@ pub struct SemaphoreInner {
 }
 
 impl Semaphore {
+    /// get next queue id
+    pub fn get_next_queue_id(&self) -> isize {
+        let inner = self.inner.exclusive_access();
+        if inner.wait_queue.len() < 1 {
+            -1
+        } else {
+            if let Some(waking_task) = inner.wait_queue.front() {
+                waking_task.inner_exclusive_access().res.as_ref().unwrap().tid as isize
+            } else {
+                -1
+            }
+        }
+    }
     /// Create a new semaphore
     pub fn new(res_count: usize) -> Self {
         trace!("kernel: Semaphore::new");
