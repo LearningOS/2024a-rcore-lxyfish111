@@ -65,8 +65,11 @@ impl TaskControlBlock {
                         // 2 -> stderr
                         Some(Arc::new(Stdout)),
                     ],
+                    res: todo!(),
                 })
             },
+            process: todo!(),
+            kstack: todo!(),
         });
         parent_inner.children.push(task_control_block.clone());
         let trap_cx=task_control_block.inner_exclusive_access().get_trap_cx();
@@ -250,9 +253,12 @@ impl TaskControlBlock {
                     exit_code: None,
                     syscall_times: [0; MAX_SYSCALL_NUM],
                     start_time: 0,
+                    res: todo!(),
                 })
             },
-        }
+            process: todo!(),
+            kstack: todo!(),
+        })
     }
 }
 
